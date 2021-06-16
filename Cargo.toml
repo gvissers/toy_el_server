@@ -1,0 +1,10 @@
+[package]
+name = "toy_el_server"
+version = "0.1.0"
+authors = ["Gé Vissers"]
+edition = "2018"
+description = "A small toy server for testing the Eternal Lands client. Not useful for real gameplay."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
