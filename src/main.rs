@@ -6,7 +6,9 @@ enum ServerCommand
 {
     RawText,
     SendOpeningScreen = 9,
-    Invalid = 10
+    SendVersion,
+    HeartBeat = 14,
+    Invalid
 }
 
 #[derive(Clone, Copy)]
@@ -30,7 +32,7 @@ enum ChatChannel
     Popup = 0xff
 }
 
-const CMD_LUT: [ServerCommand; 11] = [
+const CMD_LUT: [ServerCommand; 16] = [
     ServerCommand::RawText,
     ServerCommand::Invalid,
     ServerCommand::Invalid,
@@ -41,6 +43,11 @@ const CMD_LUT: [ServerCommand; 11] = [
     ServerCommand::Invalid,
     ServerCommand::Invalid,
     ServerCommand::SendOpeningScreen,
+    ServerCommand::SendVersion,
+    ServerCommand::Invalid,
+    ServerCommand::Invalid,
+    ServerCommand::Invalid,
+    ServerCommand::HeartBeat,
     ServerCommand::Invalid,
 ];
 
@@ -146,6 +153,32 @@ fn send_text(client: &mut std::net::TcpStream, channel: ChatChannel, text: &str)
     send(client, ClientCommand::RawText, &msg)
 }
 
+fn handle_version(data: &[u8]) -> Result<(), String>
+{
+    if data.len() != 14
+    {
+        Err(format!("Invalid version packet length {}", data.len()))
+    }
+    else
+    {
+        let protocol_major = ((data[1] as u16) << 8) | data[0] as u16;
+        let protocol_minor = ((data[3] as u16) << 8) | data[2] as u16;
+        let client_major = data[4] as u8;
+        let client_minor = data[5] as u8;
+        let client_release = data[6] as u8;
+        let client_build = data[7] as u8;
+        let ip = &data[8..12];
+        let port = ((data[13] as u16) << 8) | data[12] as u16;
+        // Let's assume the client set the IP address and port number correctly
+        println!("Got {:?}, protocol = {}.{}, client = {}.{}.{}.{}, IP = {}.{}.{}.{}, port = {}",
+            ServerCommand::SendVersion,
+            protocol_major, protocol_minor,
+            client_major, client_minor, client_release, client_build,
+            ip[0], ip[1], ip[2], ip[3], port);
+        Ok(())
+    }
+}
+
 fn handle_message(client: &mut std::net::TcpStream, code: u8, data: &[u8]) -> Result<(), String>
 {
     match get_command(code)
@@ -160,6 +193,8 @@ fn handle_message(client: &mut std::net::TcpStream, code: u8, data: &[u8]) -> Re
                     // Looks like this may be ignored by the official server, but here we go:
                     send_text(client, ChatChannel::Server, "Welcome to the EL Toy Server!")?;
                 },
+                ServerCommand::SendVersion => { handle_version(data)?; },
+                ServerCommand::HeartBeat => { println!("Got {:?}", cmd); },
                 ServerCommand::Invalid => { println!("Got {:?} {}", cmd, code); }
             }
         }
