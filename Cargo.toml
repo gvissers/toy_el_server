@@ -8,3 +8,4 @@ description = "A small toy server for testing the Eternal Lands client. Not usef
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+openssl = "0.10"
