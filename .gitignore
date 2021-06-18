@@ -1,3 +1,4 @@
 /target
-*.{key,cert}
+*.key
+*.cert
 
