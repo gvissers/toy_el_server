@@ -1,11 +1,30 @@
 //! # A toy Eternal Lands server
 //!
 //! This crate implements a toy server for the online MMORPG [Eternal Lands](http://www.eternal-lands.com).
-//! I was created to investigate the possibilities of encrypting the network traffic between the
+//! It was created to investigate the possibilities of encrypting the network traffic between the
 //! client and the server using TLS (or the highest supported variant of SSL supported by both
-//! the client and the server. It is not meant as a serious server implementation, and does not do
+//! the client and the server). It is not meant as a serious server implementation, and does not do
 //! much apart from logging some information abut incoming traffic and trying to set up an encrypted
 //! connection. At the moment you cannot even log in using this server!
+//!
+//! ## Installation
+//!
+//! Compile the program:
+//! ```
+//! cargo build
+//! ```
+//! Generate a certificate and private key using the provided script:
+//! ```
+//! ./gen_cert_key.sh
+//! ```
+//! And start the server:
+//! ```
+//! ./target/debug/toy_el_server # or "cargo run"
+//! ```
+//! The server will listen for new connection on port 2121 on localhost.
+
+// Clippy does not like Allman indentation. It is wrong :P
+#![allow(clippy::suspicious_else_formatting)]
 
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod, SslStream};
 use std::io::Read;
@@ -70,12 +89,14 @@ enum ClientCommand
     LogInNotOk = 251
 }
 
+/// Enumeration of the different text channels in the game
 #[derive(Clone, Copy)]
 enum ChatChannel
 {
 //     Local,
 //     Personal,
 //     Guild,
+    /// Messages from the server
     Server = 3,
 //     Moderator,
 //     Channel1,
@@ -99,7 +120,7 @@ enum EncryptionStatus
     Encrypted
 }
 
-/// Enumeration for newtork streams
+/// Enumeration for network streams
 enum Socket
 {
     /// Normal, unencrypted network stream
@@ -188,7 +209,7 @@ struct Client
 
 impl Client
 {
-    /// Crete a new client, connected on socket `socket`
+    /// Create a new client, connected on socket `socket`
     fn new(socket: std::net::TcpStream) -> Self
     {
         Client { socket: Socket::Unencrypted(socket), encryption_status: EncryptionStatus::Unencrypted }
@@ -285,7 +306,7 @@ impl Client
     /// the next traffic on the connection will be the TLS handshake.
     fn handle_encryption_reply(&mut self, data: &[u8]) -> Result<(), String>
     {
-        if data.len() == 0
+        if data.is_empty()
         {
             Err(String::from("Invalid encryption reply"))
         }
@@ -306,7 +327,7 @@ impl Client
         }
     }
 
-    /// Hndle an incomming message with command code `code` and auxiliary data `data`.
+    /// Handle an incomming message with command code `code` and auxiliary data `data`.
     fn handle_message(&mut self, code: u8, data: &[u8]) -> Result<(), String>
     {
         match Self::get_command(code)
@@ -381,8 +402,8 @@ impl Client
 
     /// Do a regular read of data into `buffer`, i.e. read as much as possible, and then handle
     /// any complete messages in the buffer. `buffer_used` is the number of bytes that are already
-    /// in `buffer`; new data is appended after these. Returns the length of the buffer after
-    /// reading and handling incoming messages.
+    /// in `buffer`; new data is appended after these. Returns the new number of bytes remaining in
+    /// the buffer after reading and handling incoming messages.
     fn read_regular(&mut self, buffer: &mut [u8], buffer_used: usize) -> Result<usize, String>
     {
         let nr_bytes = self.read_buffer(&mut buffer[buffer_used..])?;
@@ -392,8 +413,8 @@ impl Client
 
     /// Read at most a single message from the connection, and (if it is complete) process it.
     /// This is done after an invitation to encrypt the connection has been sent to the client,
-    /// to prevent the server from reading the TLS handshake data as client messages. Returns
-    /// the number of bytes in the buffer after reading and handling incoming messages.
+    /// to prevent the server from reading the TLS handshake data as client messages. Returns the
+    /// new number of bytes remaining in the buffer after reading and handling incoming messages.
     fn read_piecemeal(&mut self, buffer: &mut [u8], buffer_used: usize) -> Result<usize, String>
     {
         // Ensure no complete message is left in the buffer
@@ -409,7 +430,7 @@ impl Client
         if used >= 3
         {
             // An incomplete message is left in the buffer, try to complete it
-            let msg_len = 2 + ((buffer[2] as usize) << 8) | buffer[1] as usize;
+            let msg_len = 2 + ((buffer[2] as usize) << 8) + buffer[1] as usize;
             if msg_len < 3 || msg_len > buffer.len()
             {
                 return Err(String::from("Invalid message length"));
